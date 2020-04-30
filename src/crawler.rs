@@ -119,13 +119,6 @@ impl CrawlerWorker {
                     url: parsed_url,
                     content
                 })).unwrap();
-
-                // let (save_path_folder, save_path_name) = get_save_path(&parsed_url);
-                // tokio::task::spawn(async move {
-                //     let base_path = format!("data/{}", save_path_folder);
-                //     tokio::fs::create_dir_all(&base_path).await.unwrap();
-                //     tokio::fs::write(format!("{}/{}", base_path, save_path_name), content).await;
-                // });
             }
 
             // Insert the links
