@@ -1,12 +1,11 @@
 use std::collections::HashMap;
+use std::io::{BufReader, Seek, Read, Write, BufWriter, SeekFrom};
+use std::fs::File;
+use std::cell::RefCell;
+use std::ffi::OsStr;
 
 use crate::term::{TermDocumentEntry, TermDocuments, Term};
 use crate::index::Index;
-use std::io::{BufReader, Seek, Read, Write, BufWriter};
-use std::fs::File;
-use futures::io::SeekFrom;
-use std::cell::RefCell;
-use std::ffi::OsStr;
 
 fn write_u32(storage: &mut Vec<u8>, offset: &mut usize, value: u32) {
     let bytes = value.to_le_bytes();

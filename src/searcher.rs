@@ -73,7 +73,6 @@ impl Searcher {
     }
 }
 
-
 #[test]
 fn test_intersection_search1() {
     let mut indexer = Indexer::new(create_test_index(), create_test_document_storage());

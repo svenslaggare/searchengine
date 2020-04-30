@@ -39,9 +39,9 @@ impl Indexer {
 
     pub fn add_document(&mut self, document: Document) {
         let document_id = self.next_document_id;
-        self.document_storage.store(document_id, &document);
-
         self.next_document_id += 1;
+
+        self.document_storage.store(document_id, &document);
 
         let mut token_indices = (0..document.tokens().len()).collect::<Vec<_>>();
         token_indices.sort_by_key(|index| &document.tokens()[*index]);
