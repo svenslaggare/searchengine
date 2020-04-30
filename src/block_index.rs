@@ -362,9 +362,9 @@ pub struct BlockIndexConfig {
 }
 
 impl BlockIndexConfig {
-    pub fn default() -> BlockIndexConfig {
+    pub fn default(index_folder: Option<String>) -> BlockIndexConfig {
         BlockIndexConfig {
-            index_folder: Some("index".to_owned()),
+            index_folder,
             use_existing: false,
             block_size: 256,
             reuse_blocks: true,
@@ -372,8 +372,8 @@ impl BlockIndexConfig {
         }
     }
 
-    pub fn use_existing() -> BlockIndexConfig {
-        let mut config = BlockIndexConfig::default();
+    pub fn use_existing(index_folder: Option<String>) -> BlockIndexConfig {
+        let mut config = BlockIndexConfig::default(index_folder);
         config.use_existing = true;
         config
     }

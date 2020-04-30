@@ -204,7 +204,7 @@ impl Crawler {
                 std::thread::sleep(std::time::Duration::from_millis(10));
             }
 
-            if (std::time::Instant::now() - start_time).as_secs() >= 1200 {
+            if (std::time::Instant::now() - start_time).as_secs() >= 60 {
                 self.worker.results_sender.send(None);
                 break;
             }

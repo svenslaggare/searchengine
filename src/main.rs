@@ -53,11 +53,13 @@ async fn main_crawl() -> Result<(), Box<dyn std::error::Error>> {
     //         std::fs::write(format!("{}/{}", base_path, save_path_name), result.content);
     //     }
     // });
+
     let handle = std::thread::spawn(move || {
+        let index_folder = "index";
         let parser = Parser::new();
         let mut indexer = Indexer::new(
-            Box::new(BlockIndex::new(BlockIndexConfig::default())),
-            Box::new(DocumentFileStorage::new("index/document_storage"))
+            Box::new(BlockIndex::new(BlockIndexConfig::default(Some(index_folder.to_owned())))),
+            Box::new(DocumentFileStorage::new(&format!("{}/document_storage", index_folder)))
         );
 
         for result in &result_receiver {
@@ -81,12 +83,13 @@ async fn main_crawl() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn main_index_from_files() {
-    let parser = Parser::new();
+    let index_folder = "index";
     let mut indexer = Indexer::new(
-        Box::new(BlockIndex::new(BlockIndexConfig::default())),
-        Box::new(DocumentFileStorage::new("index/document_storage"))
+        Box::new(BlockIndex::new(BlockIndexConfig::use_existing(Some(index_folder.to_owned())))),
+        Box::new(DocumentFileStorage::from_existing(&format!("{}/document_storage", index_folder)))
     );
     let searcher = Searcher::new();
+    let parser = Parser::new();
 
     let t0 = std::time::Instant::now();
     let mut document_index = 0;
@@ -111,29 +114,25 @@ fn main_index_from_files() {
 }
 
 fn main_search() {
+    let index_folder = "large_index";
     let mut indexer = Indexer::new(
-        Box::new(BlockIndex::new(BlockIndexConfig::use_existing())),
-        Box::new(DocumentFileStorage::from_existing("index/document_storage"))
+        Box::new(BlockIndex::new(BlockIndexConfig::use_existing(Some(index_folder.to_owned())))),
+        Box::new(DocumentFileStorage::from_existing(&format!("{}/document_storage", index_folder)))
     );
     let searcher = Searcher::new();
     let ranker = Ranker::new();
 
     // indexer.print_stats();
 
-    let query = vec!["computer".to_owned(), "hardware".to_owned(), "technology".to_owned()];
-    // let results = searcher.intersection_search(
-    //     &indexer,
-    //     query
-    // );
-    //
-    // println!("Search results: {}", results.len());
-    // for document_index in results {
-    //     println!("{}", document_index);
-    // }
+    let query = vec![
+        "computer".to_owned(),
+        "hardware".to_owned(),
+        "technology".to_owned()
+    ];
 
     let results = ranker.rank(&indexer, searcher.intersection_search(&indexer, query));
     println!("Search results: {}", results.len());
-    for (document_id, score) in results.iter().take(20) {
+    for (document_id, score) in results.iter().take(25) {
         println!("{} (id: {}): ({})", indexer.document_storage().get_title(*document_id), document_id, score);
     }
 }

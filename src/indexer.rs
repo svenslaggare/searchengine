@@ -90,8 +90,7 @@ impl Indexer {
 pub fn create_test_index() -> Box<dyn Index> {
     // Box::new(HashMapIndex::new())
 
-    let mut index_config = BlockIndexConfig::default();
-    index_config.index_folder = None;
+    let mut index_config = BlockIndexConfig::default(None);
     Box::new(BlockIndex::new(index_config))
 }
 

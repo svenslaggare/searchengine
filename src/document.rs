@@ -6,7 +6,6 @@ use std::cell::RefCell;
 use crate::tokenizer::Tokens;
 use crate::term::DocumentId;
 
-
 pub struct Document {
     title: String,
     tokens: Tokens
