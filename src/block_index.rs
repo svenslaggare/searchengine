@@ -570,6 +570,36 @@ impl BlockIndex {
     }
 }
 
+pub struct BlockIndexIterator<'a> {
+    block_index: &'a BlockIndex,
+    terms: Vec<String>,
+    current_index: usize
+}
+
+impl<'a> BlockIndexIterator<'a> {
+    pub fn new(block_index: &'a BlockIndex, terms: Vec<String>) -> BlockIndexIterator<'a> {
+        BlockIndexIterator {
+            block_index,
+            terms,
+            current_index: 0
+        }
+    }
+}
+
+impl<'a> Iterator for BlockIndexIterator<'a> {
+    type Item = (Term, TermDocuments);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.current_index >= self.terms.len() {
+            return None;
+        }
+
+        let index = self.current_index;
+        self.current_index += 1;
+        Some((self.terms[index].clone(), self.block_index.read_documents(&self.terms[index])))
+    }
+}
+
 impl Index for BlockIndex {
     fn num_terms(&self) -> usize {
         self.storage.num_terms()
@@ -592,15 +622,9 @@ impl Index for BlockIndex {
         self.read_term_documents_internal(term).documents
     }
 
-    fn iter(&self) -> Box<dyn Iterator<Item=(Term, TermDocuments)>> {
-        let mut terms = Vec::new();
-
-        for term in self.storage.terms_iter() {
-            let documents = self.read_documents(&term);
-            terms.push((term, documents));
-        }
-
-        Box::new(terms.into_iter())
+    fn iter<'a>(&'a self) -> Box<dyn Iterator<Item=(Term, TermDocuments)> + 'a> {
+        let terms = self.storage.terms_iter().collect::<Vec<_>>();
+        Box::new(BlockIndexIterator::<'a>::new(self, terms))
     }
 }
 
@@ -1100,4 +1124,37 @@ fn test_reallocate4() {
     let read_term2_entry1 = &read_term2_documents.documents()[0];
     assert_eq!(term2_entry1.document(), read_term2_entry1.document());
     assert_eq!(term2_entry1.offsets(), read_term2_entry1.offsets());
+}
+
+#[test]
+fn test_iterate1() {
+    let mut index = BlockIndex::new(BlockIndexConfig::testing());
+
+    let mut term1_entry1 = TermDocumentEntry::new(1337);
+    term1_entry1.add_offset(1414);
+    term1_entry1.add_offset(1561);
+    term1_entry1.add_offset(7151);
+    index.add(&"A".to_owned(), term1_entry1.clone());
+
+    let mut term2_entry1 = TermDocumentEntry::new(31431);
+    term2_entry1.add_offset(131);
+    term2_entry1.add_offset(454);
+    index.add(&"B".to_owned(), term2_entry1.clone());
+
+    let mut term2_entry2 = TermDocumentEntry::new(314341);
+    term2_entry2.add_offset(2141);
+    term2_entry2.add_offset(434);
+    term2_entry2.add_offset(424);
+    index.add(&"B".to_owned(), term2_entry2.clone());
+
+    let mut block_index_iter_result = index.iter().collect::<Vec<_>>();
+    block_index_iter_result.sort_by(|x, y| x.0.cmp(&y.0));
+
+    assert_eq!(block_index_iter_result.len(), 2);
+
+    assert_eq!(&block_index_iter_result[0].0, &"A");
+    assert_eq!(block_index_iter_result[0].1.len(), 1);
+
+    assert_eq!(&block_index_iter_result[1].0, &"B");
+    assert_eq!(block_index_iter_result[1].1.len(), 2);
 }

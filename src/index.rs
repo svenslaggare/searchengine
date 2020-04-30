@@ -9,7 +9,7 @@ pub trait Index {
     fn add(&mut self, term: &Term, entry: TermDocumentEntry);
     fn read_documents(&self, term: &Term) -> TermDocuments;
 
-    fn iter(&self) -> Box<dyn Iterator<Item=(Term, TermDocuments)>>;
+    fn iter<'a>(&'a self) -> Box<dyn Iterator<Item=(Term, TermDocuments)> + 'a>;
 }
 
 pub struct HashMapIndex {
@@ -37,7 +37,7 @@ impl Index for HashMapIndex {
         self.index[term].clone()
     }
 
-    fn iter(&self) -> Box<dyn Iterator<Item=(Term, TermDocuments)>> {
+    fn iter<'a>(&'a self) -> Box<dyn Iterator<Item=(Term, TermDocuments)> + 'a> {
         Box::new(self.index.iter().map(|(k, v)| (k.clone(), v.clone())).collect::<Vec<_>>().into_iter())
     }
 }

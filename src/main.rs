@@ -78,7 +78,7 @@ async fn main_crawl() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     crawler.run("https://en.wikipedia.org/wiki/Main_Page");
-    handle.join();
+    handle.join().unwrap();
     Ok(())
 }
 
@@ -139,7 +139,7 @@ fn main_search() {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    main_crawl().await.unwrap();
-    // main_search();
+    // main_crawl().await.unwrap();
+    main_search();
     Ok(())
 }

@@ -204,7 +204,7 @@ impl Crawler {
             }
 
             if (std::time::Instant::now() - start_time).as_secs() >= 60 {
-                self.worker.results_sender.send(None);
+                self.worker.results_sender.send(None).unwrap();
                 break;
             }
         }
