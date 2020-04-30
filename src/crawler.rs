@@ -82,7 +82,7 @@ pub fn get_save_path(parsed_url: &Url) -> (String, String) {
 struct CrawlerWorker {
     link_extractor: LinkExtractor,
     crawled_links: Arc<RwLock<CrawledLinks>>,
-    crawl_queue: Arc<Mutex<VecDeque<String>>>,
+    crawl_queue: Arc<crossbeam::queue::SegQueue<String>>,
     results_sender: crossbeam::Sender<Option<CrawlResult>>,
     num_active_requests: Arc<AtomicU64>,
     num_crawled: Arc<AtomicU64>,
@@ -90,7 +90,7 @@ struct CrawlerWorker {
 
 impl CrawlerWorker {
     fn new(crawled_links: Arc<RwLock<CrawledLinks>>,
-           crawl_queue: Arc<Mutex<VecDeque<String>>>,
+           crawl_queue: Arc<crossbeam::queue::SegQueue<String>>,
            results_sender: crossbeam::Sender<Option<CrawlResult>>) -> CrawlerWorker {
         CrawlerWorker {
             link_extractor: LinkExtractor::new(),
@@ -124,7 +124,6 @@ impl CrawlerWorker {
             // Insert the links
             {
                 let mut crawled_links_guard = self.crawled_links.write().unwrap();
-                let mut crawl_queue_guard = self.crawl_queue.lock().unwrap();
 
                 let mut total_links = 0;
                 let mut new_links = 0;
@@ -137,7 +136,7 @@ impl CrawlerWorker {
 
                     if !crawled_links_guard.contains(&link) {
                         crawled_links_guard.insert(link.clone());
-                        crawl_queue_guard.push_back(link);
+                        self.crawl_queue.push(link);
                         new_links += 1;
                     }
 
@@ -155,7 +154,7 @@ impl CrawlerWorker {
 
 pub struct Crawler {
     crawled_links: Arc<RwLock<CrawledLinks>>,
-    crawl_queue: Arc<Mutex<VecDeque<String>>>,
+    crawl_queue: Arc<crossbeam::queue::SegQueue<String>>,
     pub result_receiver: crossbeam::Receiver<Option<CrawlResult>>,
     worker: Arc<CrawlerWorker>,
 }
@@ -163,7 +162,7 @@ pub struct Crawler {
 impl Crawler {
     pub fn new() -> Crawler {
         let crawled_links = Arc::new(RwLock::new(CrawledLinks::new()));
-        let crawl_queue = Arc::new(Mutex::new(VecDeque::new()));
+        let crawl_queue = Arc::new(crossbeam::queue::SegQueue::new());
         let (result_sender, result_receiver) = crossbeam::unbounded();
 
         Crawler {
@@ -176,7 +175,7 @@ impl Crawler {
 
 
     pub fn run(&self, start_url: &str) {
-        self.crawl_queue.lock().unwrap().push_back(start_url.to_owned());
+        self.crawl_queue.push(start_url.to_owned());
         let start_time = std::time::Instant::now();
 
         loop {
@@ -187,7 +186,7 @@ impl Crawler {
             );
 
             if self.worker.num_active_requests.load(Ordering::SeqCst) < 100 {
-                if let Some(current_url) = self.crawl_queue.lock().unwrap().pop_front() {
+                if let Ok(current_url) = self.crawl_queue.pop() {
                     println!("Crawling url: {}", current_url);
                     self.worker.num_active_requests.fetch_add(1, Ordering::SeqCst);
 
