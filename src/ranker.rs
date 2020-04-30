@@ -17,6 +17,7 @@ impl Ranker {
     }
 
     fn calculate_tf_idf(num_documents: f64, df: f64, tf: f64, length: f64) -> f64 {
+        // Scoring using the tf-idf model
         let mut tf = tf;
         let idf = (num_documents / df).log10();
         if tf > 0.0 {
@@ -37,12 +38,14 @@ impl Ranker {
                 Ordering::Equal
             }
         });
+
         document_scores
     }
 
     pub fn rank(&self, indexer: &Indexer, query_term_documents: Vec<TermDocuments>) -> Vec<(DocumentId, f64)> {
         let num_documents = indexer.document_storage().num_documents() as f64;
 
+        // Compute score of documents using cosine similarity
         let mut document_scores = HashMap::new();
         for term_documents in &query_term_documents {
             let score_query = Ranker::calculate_tf_idf(

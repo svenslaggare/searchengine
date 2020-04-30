@@ -129,9 +129,9 @@ impl CrawlerWorker {
                 let mut new_links = 0;
                 for link in extracted_links {
                     let link_url = Url::parse(&link).unwrap();
-                    let normalized_link = link_url.scheme().to_owned() + "://" + link_url.domain().unwrap() + link_url.path();
 
-                    // println!("{} -> {}", link, normalized_link);
+                    // Normalize the link to get rid of dynamic parameters
+                    let normalized_link = link_url.scheme().to_owned() + "://" + link_url.domain().unwrap() + link_url.path();
                     let link = normalized_link;
 
                     if !crawled_links_guard.contains(&link) {

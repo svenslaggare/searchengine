@@ -13,6 +13,7 @@ pub struct Tokenizer {
 impl Tokenizer {
     pub fn new() -> Tokenizer {
         Tokenizer {
+            // Chars that leads to new tokens
             separator_characters: HashSet::from_iter(vec![
                 ' ',
                 '\t',
@@ -29,6 +30,7 @@ impl Tokenizer {
                 '&',
                 '\\',
             ].into_iter()),
+            // Chars that are ignored entirely
             ignore_characters: HashSet::from_iter(vec![
                 '(',
                 ')',

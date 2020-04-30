@@ -53,6 +53,7 @@ impl ContentExtractor {
 
             if tag.starts_with("</") {
                 if tags.len() > 0 && tags.last().unwrap().tag_type == TagType::End {
+                    // Add 'dummy' tags with the content between two tags
                     tags.push(Tag {
                         tag_type: TagType::Start,
                         tag_name: "".to_owned(),
@@ -76,6 +77,7 @@ impl ContentExtractor {
                 });
             } else {
                 if tags.len() > 0 {
+                    // Add 'dummy' tags with the content between two tags
                     tags.push(Tag {
                         tag_type: TagType::Start,
                         tag_name: "".to_owned(),
@@ -127,6 +129,7 @@ impl ContentExtractor {
                        tag: tag.clone()
                     });
 
+                    // Skips entire node
                     if tag.tag_name == "sup" {
                         ignore_tag = Some(tag.tag_name.to_owned());
                     }
@@ -142,6 +145,7 @@ impl ContentExtractor {
                     }
 
                     if index - start_tag.index == 1 && start_tag.tag.tag_name == tag.tag_name {
+                        // Ignore content
                         if start_tag.tag.tag_name == "script" || start_tag.tag.tag_name == "style" {
                             continue;
                         }
@@ -151,6 +155,7 @@ impl ContentExtractor {
                         if start_tag.tag.tag_name != "title" {
                             extracted += extracted_tag_content;
                         } else {
+                            // Set title of the document based on the '<title'> tag
                             title = Some(extracted_tag_content.to_owned());
                         }
                     }

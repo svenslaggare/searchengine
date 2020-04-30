@@ -27,7 +27,10 @@ impl Indexer {
     }
 
     pub fn get_from_index(&self, term: &Term) -> TermDocuments {
-        self.index.read_documents(term)
+        // let t0 = std::time::Instant::now();
+        let documents = self.index.read_documents(term);
+        // println!("Search time: {} ms", (std::time::Instant::now() - t0).as_nanos() as f64 / 1E6);
+        documents
     }
 
     pub fn document_storage(&self) -> &Box<dyn DocumentStorage> {

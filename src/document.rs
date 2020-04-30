@@ -89,6 +89,8 @@ impl DocumentStorage for DocumentFileStorage {
     }
 
     fn store(&mut self, id: DocumentId, document: &Document) {
+        // We use a fixed size entry to store the document info.
+        // This allow fast & easy indexing at the cost of wasted space.
         if self.last_document_id.is_some() {
             assert_eq!(id, self.last_document_id.unwrap() + 1);
         } else {
