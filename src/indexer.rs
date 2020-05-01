@@ -79,7 +79,7 @@ impl Indexer {
         self.index.print_stats();
 
         let mut term_document_counts = Vec::from_iter(self.index.iter().map(|(term, results)| (term.clone(), results.documents().len())));
-        term_document_counts.sort_by_key(|(term, count)| -(*count as i64));
+        term_document_counts.sort_by_key(|(_, count)| -(*count as i64));
 
         println!();
         println!("Terms by number of documents: ");

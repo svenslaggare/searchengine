@@ -1,13 +1,9 @@
-use std::path::{Path, PathBuf};
-use std::fs::{DirEntry, File};
-use std::io::{BufWriter, Write};
-
-use futures::future;
+use std::path::{Path};
+use std::fs::{DirEntry};
 
 use crate::crawler::Crawler;
 use crate::indexer::{Indexer};
 use crate::parser::Parser;
-use crate::tokenizer::Tokens;
 use crate::block_index::{BlockIndex, BlockIndexConfig};
 use crate::searcher::Searcher;
 use crate::document::{DocumentFileStorage, Document};

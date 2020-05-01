@@ -312,7 +312,7 @@ impl BlockIndexStorage for BlockIndexFileStorage {
     }
 
     fn write_u64(&mut self, offset: &mut usize, value: u64) {
-        let mut buffer = value.to_le_bytes();
+        let buffer = value.to_le_bytes();
         let mut file = self.file_index.borrow_mut();
         file.seek(SeekFrom::Start(*offset as u64)).unwrap();
         file.write_all(&buffer[..]).unwrap();
@@ -416,7 +416,7 @@ impl BlockIndex {
         let storage: Box<dyn BlockIndexStorage> = if use_memory_based {
             Box::new(BlockIndexMemoryStorage::new())
         } else {
-            std::fs::create_dir_all(&index_folder);
+            std::fs::create_dir_all(&index_folder).unwrap();
 
             if config.use_existing {
                 Box::new(BlockIndexFileStorage::from_existing(&index_folder))

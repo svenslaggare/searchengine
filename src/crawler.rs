@@ -1,8 +1,6 @@
-use std::iter::FromIterator;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{RwLock, Mutex, Arc};
-use std::future::Future;
-use std::collections::{HashSet, VecDeque};
+use std::sync::{RwLock, Arc};
+use std::collections::{HashSet};
 
 use regex::Regex;
 
@@ -10,13 +8,15 @@ use futures::future::{BoxFuture, FutureExt};
 use url::Url;
 
 struct LinkExtractor {
-    pattern: Regex
+    pattern: Regex,
+    accept: fn(&str) -> bool
 }
 
 impl LinkExtractor {
-    fn new() -> LinkExtractor {
+    fn new(accept: fn(&str) -> bool) -> LinkExtractor {
         LinkExtractor {
-            pattern: Regex::new("<a.*href=\"([^\"]+)\".*>").unwrap()
+            pattern: Regex::new("<a.*href=\"([^\"]+)\".*>").unwrap(),
+            accept
         }
     }
 
@@ -31,7 +31,7 @@ impl LinkExtractor {
                 link = format!("{}{}", base_url, link);
             }
 
-            if link.starts_with("https://en.wikipedia.org") {
+            if (self.accept)(&link) {
                 links.push(link);
             }
         }
@@ -93,7 +93,7 @@ impl CrawlerWorker {
            crawl_queue: Arc<crossbeam::queue::SegQueue<String>>,
            results_sender: crossbeam::Sender<Option<CrawlResult>>) -> CrawlerWorker {
         CrawlerWorker {
-            link_extractor: LinkExtractor::new(),
+            link_extractor: LinkExtractor::new(|link| link.starts_with("https://en.wikipedia.org")),
             crawled_links,
             crawl_queue,
             results_sender,
