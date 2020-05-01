@@ -1,6 +1,7 @@
-use regex::Regex;
 use std::ops::Index;
 use std::iter::FromIterator;
+
+use regex::Regex;
 
 #[derive(Clone, PartialEq)]
 enum TagType {

@@ -1,6 +1,7 @@
-use regex::Regex;
 use std::collections::HashSet;
 use std::iter::FromIterator;
+
+use regex::Regex;
 
 pub type Token = String;
 pub type Tokens = Vec<Token>;
