@@ -95,15 +95,26 @@ struct TermHeader {
     next_document_start: u64
 }
 
+#[derive(Debug)]
+enum BlockIndexError {
+    GenericWriteFail { message: String, },
+    IOWriteFail { err: std::io::Error, },
+    GenericReadFail { message: String },
+    IOReadFail { err: std::io::Error, },
+    FileNotFound
+}
+
+type BlockIndexResult<T> = Result<T, BlockIndexError>;
+
 trait BlockIndexStorage {
     fn num_terms(&self) -> usize;
 
-    fn read_u32(&self, offset: &mut usize) -> u32;
-    fn read_u64(&self, offset: &mut usize) -> u64;
-    fn read_bytes(&self, offset: usize, buffer: &mut [u8]);
+    fn read_u32(&self, offset: &mut usize) -> BlockIndexResult<u32>;
+    fn read_u64(&self, offset: &mut usize) -> BlockIndexResult<u64>;
+    fn read_bytes(&self, offset: usize, buffer: &mut [u8]) -> BlockIndexResult<()>;
 
-    fn write_u64(&mut self, offset: &mut usize, value: u64);
-    fn write_bytes(&mut self, offset: usize, buffer: &ByteBuffer);
+    fn write_u64(&mut self, offset: &mut usize, value: u64) ->  BlockIndexResult<()>;
+    fn write_bytes(&mut self, offset: usize, buffer: &ByteBuffer) -> BlockIndexResult<()>;
 
     fn allocate_block(&mut self, size: usize) -> (usize, usize);
 
@@ -135,28 +146,33 @@ impl BlockIndexStorage for BlockIndexMemoryStorage {
         self.term_start_positions.len()
     }
 
-    fn read_u32(&self, offset: &mut usize) -> u32 {
-        read_u32(&self.storage, offset)
+    fn read_u32(&self, offset: &mut usize) -> BlockIndexResult<u32> {
+        Ok(read_u32(&self.storage, offset))
     }
 
-    fn read_u64(&self, offset: &mut usize) -> u64 {
-        read_u64(&self.storage, offset)
+    fn read_u64(&self, offset: &mut usize) -> BlockIndexResult<u64> {
+        Ok(read_u64(&self.storage, offset))
     }
 
-    fn read_bytes(&self, offset: usize, buffer: &mut [u8]) {
+    fn read_bytes(&self, offset: usize, buffer: &mut [u8]) -> BlockIndexResult<()> {
         for i in 0..buffer.len() {
             buffer[i] = self.storage[offset + i];
         }
+
+        Ok(())
     }
 
-    fn write_u64(&mut self, offset: &mut usize, value: u64) {
+    fn write_u64(&mut self, offset: &mut usize, value: u64) -> BlockIndexResult<()> {
         write_u64(&mut self.storage, offset, value);
+        Ok(())
     }
 
-    fn write_bytes(&mut self, offset: usize, buffer: &ByteBuffer) {
+    fn write_bytes(&mut self, offset: usize, buffer: &ByteBuffer) -> BlockIndexResult<()> {
         for (i, value) in buffer.iter().enumerate() {
             self.storage[offset + i] = *value;
         }
+
+        Ok(())
     }
 
     fn allocate_block(&mut self, size: usize) -> (usize, usize) {
@@ -215,70 +231,78 @@ impl BlockIndexFileStorage {
         }
     }
 
-    fn read_term_positions_from_file(file: File) -> HashMap<Term, usize> {
+    fn read_term_positions_from_file(file: File) -> BlockIndexResult<HashMap<Term, usize>> {
         let mut term_start_positions = HashMap::new();
         let mut buf_reader = BufReader::new(file);
 
         let mut buffer: [u8; 8] = [0; 8];
-        buf_reader.read_exact(&mut buffer[..]).unwrap();
+        buf_reader.read_exact(&mut buffer[..]).map_err(|err| BlockIndexError::IOReadFail { err })?;
         let num_terms = u64::from_le_bytes(buffer);
 
         for _ in 0..num_terms {
             let mut buffer: [u8; 8] = [0; 8];
-            buf_reader.read_exact(&mut buffer[..]).unwrap();
+            buf_reader.read_exact(&mut buffer[..]).map_err(|err| BlockIndexError::IOReadFail { err })?;
             let term_size = u64::from_le_bytes(buffer) as usize;
 
             let mut buffer = vec![0; term_size];
-            buf_reader.read_exact(&mut buffer[..]).unwrap();
-            let term = String::from_utf8(buffer).unwrap();
+            buf_reader.read_exact(&mut buffer[..]).map_err(|err| BlockIndexError::IOReadFail { err })?;
+            let term = String::from_utf8(buffer)
+                .map_err(|err| BlockIndexError::GenericReadFail { message: format!("Failed to convert to string: {}", err) })?;
 
             let mut buffer: [u8; 8] = [0; 8];
-            buf_reader.read_exact(&mut buffer[..]).unwrap();
+            buf_reader.read_exact(&mut buffer[..]).map_err(|err| BlockIndexError::IOReadFail { err })?;
             let start_position = u64::from_le_bytes(buffer) as usize;
 
             term_start_positions.insert(term, start_position);
         }
 
-        term_start_positions
+        Ok(term_start_positions)
     }
 
-    fn from_existing(folder: &str) -> BlockIndexFileStorage {
+    fn from_existing(folder: &str) -> BlockIndexResult<BlockIndexFileStorage> {
         let mut file_index = std::fs::OpenOptions::new()
             .write(true)
             .read(true)
             .open(&format!("{}/index", folder)).unwrap();
 
-        let next_term_start = file_index.seek(SeekFrom::End(0)).unwrap() as usize;
+        let next_term_start = file_index
+            .seek(SeekFrom::End(0)).map_err(|err| BlockIndexError::IOReadFail { err })? as usize;
 
-        BlockIndexFileStorage {
-            folder: folder.to_owned(),
-            term_start_positions: BlockIndexFileStorage::read_term_positions_from_file(File::open(&format!("{}/terms", folder)).unwrap()),
-            next_term_start,
-            file_index: RefCell::new(file_index),
-        }
+        let term_position_file = File::open(&format!("{}/terms", folder)).map_err(|_| BlockIndexError::FileNotFound)?;
+
+        Ok(
+            BlockIndexFileStorage {
+                folder: folder.to_owned(),
+                term_start_positions: BlockIndexFileStorage::read_term_positions_from_file(term_position_file)?,
+                next_term_start,
+                file_index: RefCell::new(file_index),
+            }
+        )
     }
 
-    fn write_term_positions_to_file(&mut self) {
+    fn write_term_positions_to_file(&mut self) -> BlockIndexResult<()> {
         let mut buf_writer = BufWriter::new(std::fs::OpenOptions::new()
             .write(true)
             .truncate(true)
             .open(&format!("{}/terms", self.folder)).unwrap()
         );
 
-        buf_writer.write_all(&self.term_start_positions.len().to_le_bytes()).unwrap();
+        buf_writer.write_all(&self.term_start_positions.len().to_le_bytes()).map_err(|err| BlockIndexError::IOWriteFail { err })?;
 
         for (term, start_position) in &self.term_start_positions {
             let bytes = term.as_bytes();
-            buf_writer.write_all(&(bytes.len() as u64).to_le_bytes()).unwrap();
-            buf_writer.write_all(bytes).unwrap();
-            buf_writer.write_all(&(*start_position as u64).to_le_bytes()).unwrap();
+            buf_writer.write_all(&(bytes.len() as u64).to_le_bytes()).map_err(|err| BlockIndexError::IOWriteFail { err })?;
+            buf_writer.write_all(bytes).map_err(|err| BlockIndexError::IOWriteFail { err })?;
+            buf_writer.write_all(&(*start_position as u64).to_le_bytes()).map_err(|err| BlockIndexError::IOWriteFail { err })?;
         }
+
+        Ok(())
     }
 }
 
 impl Drop for BlockIndexFileStorage {
     fn drop(&mut self) {
-        self.write_term_positions_to_file();
+        self.write_term_positions_to_file().unwrap();
     }
 }
 
@@ -287,42 +311,45 @@ impl BlockIndexStorage for BlockIndexFileStorage {
         self.term_start_positions.len()
     }
 
-    fn read_u32(&self, offset: &mut usize) -> u32 {
+    fn read_u32(&self, offset: &mut usize) -> BlockIndexResult<u32> {
         let mut buffer: [u8; 4] = [0; 4];
         let mut file = self.file_index.borrow_mut();
-        file.seek(SeekFrom::Start(*offset as u64)).unwrap();
-        file.read_exact(&mut buffer[..]).unwrap();
+        file.seek(SeekFrom::Start(*offset as u64)).map_err(|err| BlockIndexError::IOReadFail { err })?;
+        file.read_exact(&mut buffer[..]).map_err(|err| BlockIndexError::IOReadFail { err })?;
         *offset += buffer.len();
-        u32::from_le_bytes(buffer)
+        Ok(u32::from_le_bytes(buffer))
     }
 
-    fn read_u64(&self, offset: &mut usize) -> u64 {
+    fn read_u64(&self, offset: &mut usize) -> BlockIndexResult<u64> {
         let mut buffer: [u8; 8] = [0; 8];
         let mut file = self.file_index.borrow_mut();
-        file.seek(SeekFrom::Start(*offset as u64)).unwrap();
-        file.read_exact(&mut buffer[..]).unwrap();
+        file.seek(SeekFrom::Start(*offset as u64)).map_err(|err| BlockIndexError::IOReadFail { err })?;
+        file.read_exact(&mut buffer[..]).map_err(|err| BlockIndexError::IOReadFail { err })?;
         *offset += buffer.len();
-        u64::from_le_bytes(buffer)
+        Ok(u64::from_le_bytes(buffer))
     }
 
-    fn read_bytes(&self, offset: usize, buffer: &mut [u8]) {
+    fn read_bytes(&self, offset: usize, buffer: &mut [u8]) -> BlockIndexResult<()> {
         let mut file = self.file_index.borrow_mut();
-        file.seek(SeekFrom::Start(offset as u64)).unwrap();
-        file.read_exact(buffer).unwrap();
+        file.seek(SeekFrom::Start(offset as u64)).map_err(|err| BlockIndexError::IOReadFail { err })?;
+        file.read_exact(buffer).map_err(|err| BlockIndexError::IOReadFail { err })?;
+        Ok(())
     }
 
-    fn write_u64(&mut self, offset: &mut usize, value: u64) {
+    fn write_u64(&mut self, offset: &mut usize, value: u64) -> BlockIndexResult<()> {
         let buffer = value.to_le_bytes();
         let mut file = self.file_index.borrow_mut();
-        file.seek(SeekFrom::Start(*offset as u64)).unwrap();
-        file.write_all(&buffer[..]).unwrap();
+        file.seek(SeekFrom::Start(*offset as u64)).map_err(|err| BlockIndexError::IOWriteFail { err })?;
+        file.write_all(&buffer[..]).map_err(|err| BlockIndexError::IOWriteFail { err })?;
         *offset += buffer.len();
+        Ok(())
     }
 
-    fn write_bytes(&mut self, offset: usize, buffer: &ByteBuffer) {
+    fn write_bytes(&mut self, offset: usize, buffer: &ByteBuffer) -> BlockIndexResult<()> {
         let mut file = self.file_index.borrow_mut();
-        file.seek(SeekFrom::Start(offset as u64)).unwrap();
-        file.write_all(&buffer.buffer[..]).unwrap();
+        file.seek(SeekFrom::Start(offset as u64)).map_err(|err| BlockIndexError::IOWriteFail { err })?;
+        file.write_all(&buffer.buffer[..]).map_err(|err| BlockIndexError::IOWriteFail { err })?;
+        Ok(())
     }
 
     fn allocate_block(&mut self, size: usize) -> (usize, usize) {
@@ -419,7 +446,7 @@ impl BlockIndex {
             std::fs::create_dir_all(&index_folder).unwrap();
 
             if config.use_existing {
-                Box::new(BlockIndexFileStorage::from_existing(&index_folder))
+                Box::new(BlockIndexFileStorage::from_existing(&index_folder).unwrap())
             } else {
                 Box::new(BlockIndexFileStorage::new(&index_folder))
             }
@@ -451,17 +478,19 @@ impl BlockIndex {
         self.storage.allocate_block(size)
     }
 
-    fn read_term_header(&self, offset: usize) -> TermHeader {
+    fn read_term_header(&self, offset: usize) -> BlockIndexResult<TermHeader> {
         let mut offset = offset;
-        let term_size = self.storage.read_u64(&mut offset);
-        let num_documents = self.storage.read_u64(&mut offset);
-        let next_document_start = self.storage.read_u64(&mut offset);
+        let term_size = self.storage.read_u64(&mut offset)?;
+        let num_documents = self.storage.read_u64(&mut offset)?;
+        let next_document_start = self.storage.read_u64(&mut offset)?;
 
-        TermHeader {
-            size: term_size,
-            num_documents,
-            next_document_start
-        }
+        Ok(
+            TermHeader {
+                size: term_size,
+                num_documents,
+                next_document_start
+            }
+        )
     }
 
     fn write_term_entry(&mut self, term_entry_buffer: &mut ByteBuffer, entry: &TermDocumentEntry) {
@@ -473,7 +502,7 @@ impl BlockIndex {
         }
     }
 
-    fn write_new_term(&mut self, term: &Term, entries: Vec<&TermDocumentEntry>, grow_factor: usize) {
+    fn write_new_term(&mut self, term: &Term, entries: Vec<&TermDocumentEntry>, grow_factor: usize) -> BlockIndexResult<()> {
         let mut term_entry_buffer = ByteBuffer::new();
 
         // Write term header
@@ -505,47 +534,50 @@ impl BlockIndex {
 
         // Write to underlying storage
         self.storage.add_term_start_position(term, term_start);
-        self.storage.write_bytes(term_start, &term_entry_buffer);
+        self.storage.write_bytes(term_start, &term_entry_buffer)?;
+        Ok(())
     }
 
-    fn write_existing_term(&mut self, term: &Term, entry: &TermDocumentEntry) {
+    fn write_existing_term(&mut self, term: &Term, entry: &TermDocumentEntry) -> BlockIndexResult<()>  {
         let term_start = self.storage.get_term_start_position(term);
-        let term_header = self.read_term_header(term_start);
+        let term_header = self.read_term_header(term_start)?;
 
         let mut term_entry_buffer = ByteBuffer::new();
         self.write_term_entry(&mut term_entry_buffer, entry);
 
         if (term_header.next_document_start + term_entry_buffer.len() as u64) < term_header.size {
             // Write to the underlying storage
-            self.storage.write_bytes(term_start + term_header.next_document_start as usize, &term_entry_buffer);
+            self.storage.write_bytes(term_start + term_header.next_document_start as usize, &term_entry_buffer)?;
 
             // Update header
             let mut update_offset = term_start + std::mem::size_of::<u64>();
-            self.storage.write_u64(&mut update_offset, term_header.num_documents + 1);
-            self.storage.write_u64(&mut update_offset, term_header.next_document_start + term_entry_buffer.len() as u64);
+            self.storage.write_u64(&mut update_offset, term_header.num_documents + 1)?;
+            self.storage.write_u64(&mut update_offset, term_header.next_document_start + term_entry_buffer.len() as u64)?;
         } else {
             // Term block is not large enough, re-allocate
             self.num_reallocations += 1;
 
-            let read_entries = self.read_term_documents_internal(term);
+            let read_entries = self.read_term_documents_internal(term)?;
             self.deleted_blocks.push((read_entries.start, read_entries.size));
 
             let mut documents = read_entries.documents;
             documents.push(entry.clone());
 
             self.storage.remove_term_start_position(term);
-            self.write_new_term(term, documents.documents().iter().collect(), 2);
+            self.write_new_term(term, documents.documents().iter().collect(), 2)?;
         }
+
+        Ok(())
     }
 
-    fn read_term_documents_internal(&self, term: &Term) -> ReadTermResult {
+    fn read_term_documents_internal(&self, term: &Term) -> BlockIndexResult<ReadTermResult> {
         let mut term_documents = TermDocuments::new();
 
         let term_start = self.storage.get_term_start_position(term);
-        let term_header = self.read_term_header(term_start);
+        let term_header = self.read_term_header(term_start)?;
 
         let mut term_buffer = vec![0u8; term_header.size as usize];
-        self.storage.read_bytes(term_start, &mut term_buffer[..]);
+        self.storage.read_bytes(term_start, &mut term_buffer[..])?;
 
         let mut buffer_offset = 3 * std::mem::size_of::<u64>();
         for _ in 0..term_header.num_documents {
@@ -561,11 +593,13 @@ impl BlockIndex {
             term_documents.push(term_entry);
         }
 
-        ReadTermResult {
-            start: term_start,
-            size: term_header.size as usize,
-            documents: term_documents
-        }
+        Ok(
+            ReadTermResult {
+                start: term_start,
+                size: term_header.size as usize,
+                documents: term_documents
+            }
+        )
     }
 }
 
@@ -611,14 +645,14 @@ impl Index for BlockIndex {
 
     fn add(&mut self, term: &Term, entry: TermDocumentEntry) {
         if self.storage.term_exists(term) {
-            self.write_existing_term(term, &entry);
+            self.write_existing_term(term, &entry).unwrap();
         } else {
-            self.write_new_term(term, vec![&entry], 1);
+            self.write_new_term(term, vec![&entry], 1).unwrap();
         }
     }
 
     fn read_documents(&self, term: &Term) -> TermDocuments {
-        self.read_term_documents_internal(term).documents
+        self.read_term_documents_internal(term).unwrap().documents
     }
 
     fn iter<'a>(&'a self) -> Box<dyn Iterator<Item=(Term, TermDocuments)> + 'a> {
