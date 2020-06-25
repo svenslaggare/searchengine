@@ -5,7 +5,8 @@ use std::cell::RefCell;
 use std::ffi::OsStr;
 
 use crate::term::{TermDocumentEntry, TermDocuments, Term};
-use crate::index::Index;
+use crate::index::{Index, IndexResult, IndexError};
+use std::fmt::Formatter;
 
 fn write_u32(storage: &mut Vec<u8>, offset: &mut usize, value: u32) {
     let bytes = value.to_le_bytes();
@@ -102,6 +103,54 @@ enum BlockIndexError {
     GenericReadFail { message: String },
     IOReadFail { err: std::io::Error, },
     FileNotFound
+}
+
+impl std::error::Error for BlockIndexError {
+
+}
+
+impl std::fmt::Display for BlockIndexError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BlockIndexError::GenericWriteFail { message } => {
+                write!(f, "IO write fail: {}", message)
+            },
+            BlockIndexError::IOWriteFail { err } => {
+                write!(f, "IO write fail: {}", err)
+            },
+            BlockIndexError::GenericReadFail { message } => {
+                write!(f, "IO read fail: {}", message)
+            },
+            BlockIndexError::IOReadFail { err } => {
+                write!(f, "IO read fail: {}", err)
+            },
+            BlockIndexError::FileNotFound => {
+                write!(f, "File not found")
+            },
+        }
+    }
+}
+
+impl From<BlockIndexError> for IndexError {
+    fn from(err: BlockIndexError) -> Self {
+        match err {
+            err @ BlockIndexError::GenericWriteFail { .. } => {
+                IndexError::WriteFail { inner: Box::new(err) }
+            },
+            err @ BlockIndexError::IOWriteFail { .. }  => {
+                IndexError::WriteFail { inner: Box::new(err) }
+            },
+            err @ BlockIndexError::GenericReadFail { .. }  => {
+                IndexError::ReadFail { inner: Box::new(err) }
+            },
+            err @ BlockIndexError::IOReadFail { .. }  => {
+                IndexError::ReadFail { inner: Box::new(err) }
+            },
+            err @ BlockIndexError::FileNotFound => {
+                IndexError::Other { inner: Box::new(err) }
+            },
+        }
+    }
 }
 
 type BlockIndexResult<T> = Result<T, BlockIndexError>;
@@ -263,7 +312,8 @@ impl BlockIndexFileStorage {
         let mut file_index = std::fs::OpenOptions::new()
             .write(true)
             .read(true)
-            .open(&format!("{}/index", folder)).unwrap();
+            .open(&format!("{}/index", folder))
+            .map_err(|_| BlockIndexError::FileNotFound)?;
 
         let next_term_start = file_index
             .seek(SeekFrom::End(0)).map_err(|err| BlockIndexError::IOReadFail { err })? as usize;
@@ -281,10 +331,12 @@ impl BlockIndexFileStorage {
     }
 
     fn write_term_positions_to_file(&mut self) -> BlockIndexResult<()> {
-        let mut buf_writer = BufWriter::new(std::fs::OpenOptions::new()
-            .write(true)
-            .truncate(true)
-            .open(&format!("{}/terms", self.folder)).unwrap()
+        let mut buf_writer = BufWriter::new(
+            std::fs::OpenOptions::new()
+                .write(true)
+                .truncate(true)
+                .open(&format!("{}/terms", self.folder))
+                .map_err(|_| BlockIndexError::FileNotFound)?
         );
 
         buf_writer.write_all(&self.term_start_positions.len().to_le_bytes()).map_err(|err| BlockIndexError::IOWriteFail { err })?;
@@ -629,7 +681,7 @@ impl<'a> Iterator for BlockIndexIterator<'a> {
 
         let index = self.current_index;
         self.current_index += 1;
-        Some((self.terms[index].clone(), self.block_index.read_documents(&self.terms[index])))
+        Some((self.terms[index].clone(), self.block_index.read_documents(&self.terms[index]).ok()?))
     }
 }
 
@@ -643,16 +695,18 @@ impl Index for BlockIndex {
         println!("Number of re-used blocks: {}", self.num_reused_blocks);
     }
 
-    fn add(&mut self, term: &Term, entry: TermDocumentEntry) {
+    fn add(&mut self, term: &Term, entry: TermDocumentEntry) -> IndexResult<()> {
         if self.storage.term_exists(term) {
-            self.write_existing_term(term, &entry).unwrap();
+            self.write_existing_term(term, &entry)?;
         } else {
-            self.write_new_term(term, vec![&entry], 1).unwrap();
+            self.write_new_term(term, vec![&entry], 1)?;
         }
+
+        Ok(())
     }
 
-    fn read_documents(&self, term: &Term) -> TermDocuments {
-        self.read_term_documents_internal(term).unwrap().documents
+    fn read_documents(&self, term: &Term) -> IndexResult<TermDocuments> {
+        Ok(self.read_term_documents_internal(term)?.documents)
     }
 
     fn iter<'a>(&'a self) -> Box<dyn Iterator<Item=(Term, TermDocuments)> + 'a> {
@@ -671,6 +725,9 @@ fn test_single_document1() {
 
     index.add(&"A".to_owned(), term_entry.clone());
     let read_term_documents = index.read_documents(&"A".to_owned());
+
+    assert!(read_term_documents.is_ok());
+    let read_term_documents = read_term_documents.unwrap();
 
     assert_eq!(1, read_term_documents.len());
 
@@ -697,12 +754,18 @@ fn test_single_document2() {
     index.add(&"B".to_owned(), term_entry2.clone());
 
     let read_term1_documents = index.read_documents(&"A".to_owned());
+    assert!(read_term1_documents.is_ok());
+    let read_term1_documents = read_term1_documents.unwrap();
+
     assert_eq!(1, read_term1_documents.len());
     let read_term_entry1 = &read_term1_documents.documents()[0];
     assert_eq!(term_entry1.document(), read_term_entry1.document());
     assert_eq!(term_entry1.offsets(), read_term_entry1.offsets());
 
     let read_term2_documents = index.read_documents(&"B".to_owned());
+    assert!(read_term2_documents.is_ok());
+    let read_term2_documents = read_term2_documents.unwrap();
+
     assert_eq!(1, read_term2_documents.len());
     let read_term_entry2 = &read_term2_documents.documents()[0];
     assert_eq!(term_entry2.document(), read_term_entry2.document());
@@ -726,6 +789,8 @@ fn test_multiple_documents1() {
     index.add(&"A".to_owned(), term_entry2.clone());
 
     let read_term_documents = index.read_documents(&"A".to_owned());
+    assert!(read_term_documents.is_ok());
+    let read_term_documents = read_term_documents.unwrap();
 
     assert_eq!(2, read_term_documents.len());
 
@@ -761,6 +826,8 @@ fn test_multiple_documents2() {
     index.add(&"A".to_owned(), term_entry3.clone());
 
     let read_term_documents = index.read_documents(&"A".to_owned());
+    assert!(read_term_documents.is_ok());
+    let read_term_documents = read_term_documents.unwrap();
 
     assert_eq!(3, read_term_documents.len());
 
@@ -801,6 +868,9 @@ fn test_multiple_documents3() {
 
     // Term 1
     let read_term1_documents = index.read_documents(&"A".to_owned());
+    assert!(read_term1_documents.is_ok());
+    let read_term1_documents = read_term1_documents.unwrap();
+
     assert_eq!(2, read_term1_documents.len());
 
     let read_term1_entry1 = &read_term1_documents.documents()[0];
@@ -813,6 +883,9 @@ fn test_multiple_documents3() {
 
     // Term2
     let read_term2_documents = index.read_documents(&"B".to_owned());
+    assert!(read_term2_documents.is_ok());
+    let read_term2_documents = read_term2_documents.unwrap();
+
     assert_eq!(1, read_term2_documents.len());
     let read_term2_entry1 = &read_term2_documents.documents()[0];
     assert_eq!(term2_entry1.document(), read_term2_entry1.document());
@@ -850,6 +923,9 @@ fn test_multiple_documents4() {
 
     // Term 1
     let read_term1_documents = index.read_documents(&"A".to_owned());
+    assert!(read_term1_documents.is_ok());
+    let read_term1_documents = read_term1_documents.unwrap();
+
     assert_eq!(2, read_term1_documents.len());
 
     let read_term1_entry1 = &read_term1_documents.documents()[0];
@@ -862,6 +938,9 @@ fn test_multiple_documents4() {
 
     // Term2
     let read_term2_documents = index.read_documents(&"B".to_owned());
+    assert!(read_term2_documents.is_ok());
+    let read_term2_documents = read_term2_documents.unwrap();
+
     assert_eq!(2, read_term2_documents.len());
 
     let read_term2_entry1 = &read_term2_documents.documents()[0];
@@ -904,6 +983,9 @@ fn test_multiple_documents5() {
 
     // Term 1
     let read_term1_documents = index.read_documents(&"A".to_owned());
+    assert!(read_term1_documents.is_ok());
+    let read_term1_documents = read_term1_documents.unwrap();
+
     assert_eq!(2, read_term1_documents.len());
 
     let read_term1_entry1 = &read_term1_documents.documents()[0];
@@ -916,6 +998,9 @@ fn test_multiple_documents5() {
 
     // Term2
     let read_term2_documents = index.read_documents(&"B".to_owned());
+    assert!(read_term2_documents.is_ok());
+    let read_term2_documents = read_term2_documents.unwrap();
+
     assert_eq!(2, read_term2_documents.len());
 
     let read_term2_entry1 = &read_term2_documents.documents()[0];
@@ -966,6 +1051,9 @@ fn test_multiple_documents6() {
 
     // Term 1
     let read_term1_documents = index.read_documents(&"A".to_owned());
+    assert!(read_term1_documents.is_ok());
+    let read_term1_documents = read_term1_documents.unwrap();
+
     assert_eq!(3, read_term1_documents.len());
 
     let read_term1_entry1 = &read_term1_documents.documents()[0];
@@ -982,6 +1070,9 @@ fn test_multiple_documents6() {
 
     // Term2
     let read_term2_documents = index.read_documents(&"B".to_owned());
+    assert!(read_term2_documents.is_ok());
+    let read_term2_documents = read_term2_documents.unwrap();
+
     assert_eq!(2, read_term2_documents.len());
 
     let read_term2_entry1 = &read_term2_documents.documents()[0];
@@ -1010,6 +1101,8 @@ fn test_reallocate1() {
     index.add(&"A".to_owned(), term_entry2.clone());
 
     let read_term_documents = index.read_documents(&"A".to_owned());
+    assert!(read_term_documents.is_ok());
+    let read_term_documents = read_term_documents.unwrap();
 
     assert_eq!(2, read_term_documents.len());
 
@@ -1045,6 +1138,8 @@ fn test_reallocate2() {
 
     // Term 1
     let read_term1_documents = index.read_documents(&"A".to_owned());
+    assert!(read_term1_documents.is_ok());
+    let read_term1_documents = read_term1_documents.unwrap();
 
     assert_eq!(2, read_term1_documents.len());
 
@@ -1058,6 +1153,8 @@ fn test_reallocate2() {
 
     // Term 2
     let read_term2_documents = index.read_documents(&"B".to_owned());
+    assert!(read_term2_documents.is_ok());
+    let read_term2_documents = read_term2_documents.unwrap();
 
     assert_eq!(1, read_term2_documents.len());
 
@@ -1089,6 +1186,8 @@ fn test_reallocate3() {
 
     // Term 1
     let read_term1_documents = index.read_documents(&"A".to_owned());
+    assert!(read_term1_documents.is_ok());
+    let read_term1_documents = read_term1_documents.unwrap();
 
     assert_eq!(2, read_term1_documents.len());
 
@@ -1102,6 +1201,8 @@ fn test_reallocate3() {
 
     // Term 2
     let read_term2_documents = index.read_documents(&"B".to_owned());
+    assert!(read_term2_documents.is_ok());
+    let read_term2_documents = read_term2_documents.unwrap();
 
     assert_eq!(1, read_term2_documents.len());
 
@@ -1138,6 +1239,8 @@ fn test_reallocate4() {
 
     // Term 1
     let read_term1_documents = index.read_documents(&"A".to_owned());
+    assert!(read_term1_documents.is_ok());
+    let read_term1_documents = read_term1_documents.unwrap();
 
     assert_eq!(2, read_term1_documents.len());
 
@@ -1151,6 +1254,8 @@ fn test_reallocate4() {
 
     // Term 2
     let read_term2_documents = index.read_documents(&"B".to_owned());
+    assert!(read_term2_documents.is_ok());
+    let read_term2_documents = read_term2_documents.unwrap();
 
     assert_eq!(1, read_term2_documents.len());
 

@@ -23,12 +23,12 @@ impl Indexer {
     }
 
     fn add_to_index(&mut self, term: &Term, entry: TermDocumentEntry) {
-        self.index.add(term, entry)
+        self.index.add(term, entry).unwrap()
     }
 
     pub fn get_from_index(&self, term: &Term) -> TermDocuments {
         // let t0 = std::time::Instant::now();
-        let documents = self.index.read_documents(term);
+        let documents = self.index.read_documents(term).unwrap();
         // println!("Search time: {} ms", (std::time::Instant::now() - t0).as_nanos() as f64 / 1E6);
         documents
     }
