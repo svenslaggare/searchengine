@@ -135,7 +135,7 @@ fn main_search() {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // main_crawl().await.unwrap();
-    main_search();
+    main_crawl().await.unwrap();
+    // main_search();
     Ok(())
 }

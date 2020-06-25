@@ -173,7 +173,6 @@ impl Crawler {
         }
     }
 
-
     pub fn run(&self, start_url: &str) {
         self.crawl_queue.push(start_url.to_owned());
         let start_time = std::time::Instant::now();
@@ -203,7 +202,7 @@ impl Crawler {
                 std::thread::sleep(std::time::Duration::from_millis(10));
             }
 
-            if (std::time::Instant::now() - start_time).as_secs() >= 60 {
+            if (std::time::Instant::now() - start_time).as_secs() >= 3600 {
                 self.worker.results_sender.send(None).unwrap();
                 break;
             }
