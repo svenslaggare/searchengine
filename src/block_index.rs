@@ -723,7 +723,7 @@ fn test_single_document1() {
     term_entry.add_offset(1561);
     term_entry.add_offset(7151);
 
-    index.add(&"A".to_owned(), term_entry.clone());
+    index.add(&"A".to_owned(), term_entry.clone()).unwrap();
     let read_term_documents = index.read_documents(&"A".to_owned());
 
     assert!(read_term_documents.is_ok());
@@ -744,14 +744,14 @@ fn test_single_document2() {
     term_entry1.add_offset(1561);
     term_entry1.add_offset(7151);
 
-    index.add(&"A".to_owned(), term_entry1.clone());
+    index.add(&"A".to_owned(), term_entry1.clone()).unwrap();
 
     let mut term_entry2 = TermDocumentEntry::new(4711);
     term_entry2.add_offset(3151);
     term_entry2.add_offset(3242);
     term_entry2.add_offset(54674);
 
-    index.add(&"B".to_owned(), term_entry2.clone());
+    index.add(&"B".to_owned(), term_entry2.clone()).unwrap();
 
     let read_term1_documents = index.read_documents(&"A".to_owned());
     assert!(read_term1_documents.is_ok());
@@ -780,13 +780,13 @@ fn test_multiple_documents1() {
     term_entry1.add_offset(1414);
     term_entry1.add_offset(1561);
     term_entry1.add_offset(7151);
-    index.add(&"A".to_owned(), term_entry1.clone());
+    index.add(&"A".to_owned(), term_entry1.clone()).unwrap();
 
     let mut term_entry2 = TermDocumentEntry::new(4711);
     term_entry2.add_offset(32434);
     term_entry2.add_offset(14141);
     term_entry2.add_offset(141);
-    index.add(&"A".to_owned(), term_entry2.clone());
+    index.add(&"A".to_owned(), term_entry2.clone()).unwrap();
 
     let read_term_documents = index.read_documents(&"A".to_owned());
     assert!(read_term_documents.is_ok());
@@ -811,19 +811,19 @@ fn test_multiple_documents2() {
     term_entry1.add_offset(1414);
     term_entry1.add_offset(1561);
     term_entry1.add_offset(7151);
-    index.add(&"A".to_owned(), term_entry1.clone());
+    index.add(&"A".to_owned(), term_entry1.clone()).unwrap();
 
     let mut term_entry2 = TermDocumentEntry::new(4711);
     term_entry2.add_offset(32434);
     term_entry2.add_offset(14141);
     term_entry2.add_offset(141);
-    index.add(&"A".to_owned(), term_entry2.clone());
+    index.add(&"A".to_owned(), term_entry2.clone()).unwrap();
 
     let mut term_entry3 = TermDocumentEntry::new(2141);
     term_entry3.add_offset(1341426);
     term_entry3.add_offset(666);
     term_entry3.add_offset(2452);
-    index.add(&"A".to_owned(), term_entry3.clone());
+    index.add(&"A".to_owned(), term_entry3.clone()).unwrap();
 
     let read_term_documents = index.read_documents(&"A".to_owned());
     assert!(read_term_documents.is_ok());
@@ -852,19 +852,19 @@ fn test_multiple_documents3() {
     term1_entry1.add_offset(1414);
     term1_entry1.add_offset(1561);
     term1_entry1.add_offset(7151);
-    index.add(&"A".to_owned(), term1_entry1.clone());
+    index.add(&"A".to_owned(), term1_entry1.clone()).unwrap();
 
     let mut term2_entry1 = TermDocumentEntry::new(4711);
     term2_entry1.add_offset(32434);
     term2_entry1.add_offset(14141);
     term2_entry1.add_offset(141);
-    index.add(&"B".to_owned(), term2_entry1.clone());
+    index.add(&"B".to_owned(), term2_entry1.clone()).unwrap();
 
     let mut term1_entry2 = TermDocumentEntry::new(2141);
     term1_entry2.add_offset(1341426);
     term1_entry2.add_offset(666);
     term1_entry2.add_offset(2452);
-    index.add(&"A".to_owned(), term1_entry2.clone());
+    index.add(&"A".to_owned(), term1_entry2.clone()).unwrap();
 
     // Term 1
     let read_term1_documents = index.read_documents(&"A".to_owned());
@@ -900,26 +900,26 @@ fn test_multiple_documents4() {
     term1_entry1.add_offset(1414);
     term1_entry1.add_offset(1561);
     term1_entry1.add_offset(7151);
-    index.add(&"A".to_owned(), term1_entry1.clone());
+    index.add(&"A".to_owned(), term1_entry1.clone()).unwrap();
 
     let mut term2_entry1 = TermDocumentEntry::new(4711);
     term2_entry1.add_offset(32434);
     term2_entry1.add_offset(14141);
     term2_entry1.add_offset(141);
-    index.add(&"B".to_owned(), term2_entry1.clone());
+    index.add(&"B".to_owned(), term2_entry1.clone()).unwrap();
 
     let mut term1_entry2 = TermDocumentEntry::new(2141);
     term1_entry2.add_offset(1341426);
     term1_entry2.add_offset(666);
     term1_entry2.add_offset(2452);
-    index.add(&"A".to_owned(), term1_entry2.clone());
+    index.add(&"A".to_owned(), term1_entry2.clone()).unwrap();
 
     let mut term2_entry2 = TermDocumentEntry::new(41414);
     term2_entry2.add_offset(5454);
     term2_entry2.add_offset(1313);
     term2_entry2.add_offset(141);
     term2_entry2.add_offset(3131);
-    index.add(&"B".to_owned(), term2_entry2.clone());
+    index.add(&"B".to_owned(), term2_entry2.clone()).unwrap();
 
     // Term 1
     let read_term1_documents = index.read_documents(&"A".to_owned());
@@ -960,26 +960,26 @@ fn test_multiple_documents5() {
     term1_entry1.add_offset(1414);
     term1_entry1.add_offset(1561);
     term1_entry1.add_offset(7151);
-    index.add(&"A".to_owned(), term1_entry1.clone());
+    index.add(&"A".to_owned(), term1_entry1.clone()).unwrap();
 
     let mut term1_entry2 = TermDocumentEntry::new(2141);
     term1_entry2.add_offset(1341426);
     term1_entry2.add_offset(666);
     term1_entry2.add_offset(2452);
-    index.add(&"A".to_owned(), term1_entry2.clone());
+    index.add(&"A".to_owned(), term1_entry2.clone()).unwrap();
 
     let mut term2_entry1 = TermDocumentEntry::new(4711);
     term2_entry1.add_offset(32434);
     term2_entry1.add_offset(14141);
     term2_entry1.add_offset(141);
-    index.add(&"B".to_owned(), term2_entry1.clone());
+    index.add(&"B".to_owned(), term2_entry1.clone()).unwrap();
 
     let mut term2_entry2 = TermDocumentEntry::new(41414);
     term2_entry2.add_offset(5454);
     term2_entry2.add_offset(1313);
     term2_entry2.add_offset(141);
     term2_entry2.add_offset(3131);
-    index.add(&"B".to_owned(), term2_entry2.clone());
+    index.add(&"B".to_owned(), term2_entry2.clone()).unwrap();
 
     // Term 1
     let read_term1_documents = index.read_documents(&"A".to_owned());
@@ -1020,26 +1020,26 @@ fn test_multiple_documents6() {
     term1_entry1.add_offset(1414);
     term1_entry1.add_offset(1561);
     term1_entry1.add_offset(7151);
-    index.add(&"A".to_owned(), term1_entry1.clone());
+    index.add(&"A".to_owned(), term1_entry1.clone()).unwrap();
 
     let mut term1_entry2 = TermDocumentEntry::new(2141);
     term1_entry2.add_offset(1341426);
     term1_entry2.add_offset(666);
     term1_entry2.add_offset(2452);
-    index.add(&"A".to_owned(), term1_entry2.clone());
+    index.add(&"A".to_owned(), term1_entry2.clone()).unwrap();
 
     let mut term2_entry1 = TermDocumentEntry::new(4711);
     term2_entry1.add_offset(32434);
     term2_entry1.add_offset(14141);
     term2_entry1.add_offset(141);
-    index.add(&"B".to_owned(), term2_entry1.clone());
+    index.add(&"B".to_owned(), term2_entry1.clone()).unwrap();
 
     let mut term2_entry2 = TermDocumentEntry::new(41414);
     term2_entry2.add_offset(5454);
     term2_entry2.add_offset(1313);
     term2_entry2.add_offset(141);
     term2_entry2.add_offset(3131);
-    index.add(&"B".to_owned(), term2_entry2.clone());
+    index.add(&"B".to_owned(), term2_entry2.clone()).unwrap();
 
     let mut term1_entry3 = TermDocumentEntry::new(6621);
     term1_entry3.add_offset(13143);
@@ -1047,7 +1047,7 @@ fn test_multiple_documents6() {
     term1_entry3.add_offset(313);
     term1_entry3.add_offset(434);
     term1_entry3.add_offset(131);
-    index.add(&"A".to_owned(), term1_entry3.clone());
+    index.add(&"A".to_owned(), term1_entry3.clone()).unwrap();
 
     // Term 1
     let read_term1_documents = index.read_documents(&"A".to_owned());
@@ -1092,13 +1092,13 @@ fn test_reallocate1() {
     term_entry1.add_offset(1414);
     term_entry1.add_offset(1561);
     term_entry1.add_offset(7151);
-    index.add(&"A".to_owned(), term_entry1.clone());
+    index.add(&"A".to_owned(), term_entry1.clone()).unwrap();
 
     let mut term_entry2 = TermDocumentEntry::new(4711);
     for i in 0..2000 {
         term_entry2.add_offset(i);
     }
-    index.add(&"A".to_owned(), term_entry2.clone());
+    index.add(&"A".to_owned(), term_entry2.clone()).unwrap();
 
     let read_term_documents = index.read_documents(&"A".to_owned());
     assert!(read_term_documents.is_ok());
@@ -1123,18 +1123,18 @@ fn test_reallocate2() {
     term1_entry1.add_offset(1414);
     term1_entry1.add_offset(1561);
     term1_entry1.add_offset(7151);
-    index.add(&"A".to_owned(), term1_entry1.clone());
+    index.add(&"A".to_owned(), term1_entry1.clone()).unwrap();
 
     let mut term2_entry1 = TermDocumentEntry::new(31431);
     term2_entry1.add_offset(131);
     term2_entry1.add_offset(454);
-    index.add(&"B".to_owned(), term2_entry1.clone());
+    index.add(&"B".to_owned(), term2_entry1.clone()).unwrap();
 
     let mut term1_entry2 = TermDocumentEntry::new(4711);
     for i in 0..2000 {
         term1_entry2.add_offset(i);
     }
-    index.add(&"A".to_owned(), term1_entry2.clone());
+    index.add(&"A".to_owned(), term1_entry2.clone()).unwrap();
 
     // Term 1
     let read_term1_documents = index.read_documents(&"A".to_owned());
@@ -1171,18 +1171,18 @@ fn test_reallocate3() {
     term1_entry1.add_offset(1414);
     term1_entry1.add_offset(1561);
     term1_entry1.add_offset(7151);
-    index.add(&"A".to_owned(), term1_entry1.clone());
+    index.add(&"A".to_owned(), term1_entry1.clone()).unwrap();
 
     let mut term1_entry2 = TermDocumentEntry::new(4711);
     for i in 0..2000 {
         term1_entry2.add_offset(i);
     }
-    index.add(&"A".to_owned(), term1_entry2.clone());
+    index.add(&"A".to_owned(), term1_entry2.clone()).unwrap();
 
     let mut term2_entry1 = TermDocumentEntry::new(31431);
     term2_entry1.add_offset(131);
     term2_entry1.add_offset(454);
-    index.add(&"B".to_owned(), term2_entry1.clone());
+    index.add(&"B".to_owned(), term2_entry1.clone()).unwrap();
 
     // Term 1
     let read_term1_documents = index.read_documents(&"A".to_owned());
@@ -1221,20 +1221,20 @@ fn test_reallocate4() {
     term1_entry1.add_offset(1414);
     term1_entry1.add_offset(1561);
     term1_entry1.add_offset(7151);
-    index.add(&"A".to_owned(), term1_entry1.clone());
+    index.add(&"A".to_owned(), term1_entry1.clone()).unwrap();
 
     let mut term1_entry2 = TermDocumentEntry::new(4711);
     for i in 0..2000 {
         term1_entry2.add_offset(i);
     }
-    index.add(&"A".to_owned(), term1_entry2.clone());
+    index.add(&"A".to_owned(), term1_entry2.clone()).unwrap();
 
     let mut term2_entry1 = TermDocumentEntry::new(31431);
     term2_entry1.add_offset(131);
     term2_entry1.add_offset(454);
 
     assert_eq!(1, index.deleted_blocks.len());
-    index.add(&"B".to_owned(), term2_entry1.clone());
+    index.add(&"B".to_owned(), term2_entry1.clone()).unwrap();
     assert_eq!(0, index.deleted_blocks.len());
 
     // Term 1
@@ -1272,18 +1272,18 @@ fn test_iterate1() {
     term1_entry1.add_offset(1414);
     term1_entry1.add_offset(1561);
     term1_entry1.add_offset(7151);
-    index.add(&"A".to_owned(), term1_entry1.clone());
+    index.add(&"A".to_owned(), term1_entry1.clone()).unwrap();
 
     let mut term2_entry1 = TermDocumentEntry::new(31431);
     term2_entry1.add_offset(131);
     term2_entry1.add_offset(454);
-    index.add(&"B".to_owned(), term2_entry1.clone());
+    index.add(&"B".to_owned(), term2_entry1.clone()).unwrap();
 
     let mut term2_entry2 = TermDocumentEntry::new(314341);
     term2_entry2.add_offset(2141);
     term2_entry2.add_offset(434);
     term2_entry2.add_offset(424);
-    index.add(&"B".to_owned(), term2_entry2.clone());
+    index.add(&"B".to_owned(), term2_entry2.clone()).unwrap();
 
     let mut block_index_iter_result = index.iter().collect::<Vec<_>>();
     block_index_iter_result.sort_by(|x, y| x.0.cmp(&y.0));

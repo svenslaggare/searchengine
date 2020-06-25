@@ -3,7 +3,7 @@ use std::iter::FromIterator;
 
 use crate::tokenizer::{Tokens, Token};
 use crate::term::{Term, DocumentId, TermDocuments, TermDocumentEntry, OffsetIndex};
-use crate::index::{Index, HashMapIndex};
+use crate::index::{Index, HashMapIndex, IndexResult};
 use crate::block_index::{BlockIndex, BlockIndexConfig};
 use crate::document::{Document, DocumentStorage, create_test_document_storage};
 
@@ -22,15 +22,16 @@ impl Indexer {
         }
     }
 
-    fn add_to_index(&mut self, term: &Term, entry: TermDocumentEntry) {
-        self.index.add(term, entry).unwrap()
+    fn add_to_index(&mut self, term: &Term, entry: TermDocumentEntry) -> IndexResult<()> {
+        self.index.add(term, entry)?;
+        Ok(())
     }
 
-    pub fn get_from_index(&self, term: &Term) -> TermDocuments {
+    pub fn get_from_index(&self, term: &Term) -> IndexResult<TermDocuments> {
         // let t0 = std::time::Instant::now();
-        let documents = self.index.read_documents(term).unwrap();
+        let documents = self.index.read_documents(term)?;
         // println!("Search time: {} ms", (std::time::Instant::now() - t0).as_nanos() as f64 / 1E6);
-        documents
+        Ok(documents)
     }
 
     pub fn document_storage(&self) -> &Box<dyn DocumentStorage> {
@@ -55,7 +56,7 @@ impl Indexer {
                     if prev_token != &document.tokens()[token_index] {
                         let mut current_term_entry = TermDocumentEntry::new(document_id);
                         std::mem::swap(&mut current_term_entry, &mut term_entry);
-                        self.add_to_index(prev_token, current_term_entry);
+                        self.add_to_index(prev_token, current_term_entry).unwrap();
                         prev_token_opt = Some(document.tokens()[token_index].clone());
                     }
 
@@ -69,7 +70,7 @@ impl Indexer {
         }
 
         if let Some(prev_token) = prev_token_opt {
-            self.add_to_index(&prev_token, term_entry);
+            self.add_to_index(&prev_token, term_entry).unwrap();
         }
     }
 
@@ -105,9 +106,9 @@ fn test_build_index1() {
     indexer.add_document(Document::new("".to_owned(), vec!["A".to_owned()]));
 
     assert_eq!(3, indexer.index.num_terms());
-    assert_eq!(3, indexer.get_from_index(&"A".to_owned()).len());
-    assert_eq!(2, indexer.get_from_index(&"B".to_owned()).len());
-    assert_eq!(1, indexer.get_from_index(&"C".to_owned()).len());
+    assert_eq!(3, indexer.get_from_index(&"A".to_owned()).unwrap().len());
+    assert_eq!(2, indexer.get_from_index(&"B".to_owned()).unwrap().len());
+    assert_eq!(1, indexer.get_from_index(&"C".to_owned()).unwrap().len());
 }
 
 #[test]
@@ -118,9 +119,9 @@ fn test_build_index2() {
     indexer.add_document(Document::new("".to_owned(), vec!["A".to_owned()]));
 
     assert_eq!(3, indexer.index.num_terms());
-    assert_eq!(3, indexer.get_from_index(&"A".to_owned()).len());
-    assert_eq!(2, indexer.get_from_index(&"B".to_owned()).len());
-    assert_eq!(1, indexer.get_from_index(&"C".to_owned()).len());
+    assert_eq!(3, indexer.get_from_index(&"A".to_owned()).unwrap().len());
+    assert_eq!(2, indexer.get_from_index(&"B".to_owned()).unwrap().len());
+    assert_eq!(1, indexer.get_from_index(&"C".to_owned()).unwrap().len());
 }
 
 #[test]
@@ -131,9 +132,9 @@ fn test_build_index3() {
     indexer.add_document(Document::new("".to_owned(), vec!["A".to_owned(), "B".to_owned(), "C".to_owned()]));
 
     assert_eq!(3, indexer.index.num_terms());
-    assert_eq!(3, indexer.get_from_index(&"A".to_owned()).len());
-    assert_eq!(2, indexer.get_from_index(&"B".to_owned()).len());
-    assert_eq!(1, indexer.get_from_index(&"C".to_owned()).len());
+    assert_eq!(3, indexer.get_from_index(&"A".to_owned()).unwrap().len());
+    assert_eq!(2, indexer.get_from_index(&"B".to_owned()).unwrap().len());
+    assert_eq!(1, indexer.get_from_index(&"C".to_owned()).unwrap().len());
 }
 
 #[test]
@@ -143,17 +144,17 @@ fn test_build_index4() {
 
     assert_eq!(3, indexer.index.num_terms());
 
-    assert_eq!(1, indexer.get_from_index(&"A".to_owned()).len());
-    assert_eq!(1, indexer.get_from_index(&"A".to_owned()).documents().len());
-    assert_eq!(2, indexer.get_from_index(&"A".to_owned()).documents()[0].offsets().len());
+    assert_eq!(1, indexer.get_from_index(&"A".to_owned()).unwrap().len());
+    assert_eq!(1, indexer.get_from_index(&"A".to_owned()).unwrap().documents().len());
+    assert_eq!(2, indexer.get_from_index(&"A".to_owned()).unwrap().documents()[0].offsets().len());
 
-    assert_eq!(1, indexer.get_from_index(&"B".to_owned()).len());
-    assert_eq!(1, indexer.get_from_index(&"B".to_owned()).documents().len());
-    assert_eq!(2, indexer.get_from_index(&"B".to_owned()).documents()[0].offsets().len());
+    assert_eq!(1, indexer.get_from_index(&"B".to_owned()).unwrap().len());
+    assert_eq!(1, indexer.get_from_index(&"B".to_owned()).unwrap().documents().len());
+    assert_eq!(2, indexer.get_from_index(&"B".to_owned()).unwrap().documents()[0].offsets().len());
 
-    assert_eq!(1, indexer.get_from_index(&"C".to_owned()).len());
-    assert_eq!(1, indexer.get_from_index(&"C".to_owned()).documents().len());
-    assert_eq!(1, indexer.get_from_index(&"C".to_owned()).documents()[0].offsets().len());
+    assert_eq!(1, indexer.get_from_index(&"C".to_owned()).unwrap().len());
+    assert_eq!(1, indexer.get_from_index(&"C".to_owned()).unwrap().documents().len());
+    assert_eq!(1, indexer.get_from_index(&"C".to_owned()).unwrap().documents()[0].offsets().len());
 }
 
 #[test]
@@ -163,6 +164,6 @@ fn test_build_index5() {
     indexer.add_document(Document::new("".to_owned(), vec!["A".to_owned()]));
 
     assert_eq!(2, indexer.index.num_terms());
-    assert_eq!(2, indexer.get_from_index(&"A".to_owned()).len());
-    assert_eq!(1, indexer.get_from_index(&"B".to_owned()).len());
+    assert_eq!(2, indexer.get_from_index(&"A".to_owned()).unwrap().len());
+    assert_eq!(1, indexer.get_from_index(&"B".to_owned()).unwrap().len());
 }

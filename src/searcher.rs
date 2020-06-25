@@ -54,11 +54,11 @@ impl Searcher {
     }
 
     pub fn intersection_search_documents(&self, indexer: &Indexer, query: Tokens) -> Vec<DocumentId> {
-        self.intersection_search_documents_internal(&query.iter().map(|token| indexer.get_from_index(token)).collect())
+        self.intersection_search_documents_internal(&query.iter().map(|token| indexer.get_from_index(token).unwrap()).collect())
     }
 
     pub fn union_search(&self, indexer: &Indexer, query: Tokens) -> Vec<TermDocuments> {
-        query.iter().map(|token| indexer.get_from_index(token)).collect()
+        query.iter().map(|token| indexer.get_from_index(token).unwrap()).collect()
     }
 
     pub fn intersection_search(&self, indexer: &Indexer, query: Tokens) -> Vec<TermDocuments> {
