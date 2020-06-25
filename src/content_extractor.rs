@@ -31,6 +31,11 @@ impl Content {
     }
 }
 
+#[derive(Debug)]
+pub enum ExtractContentError {
+    ExpectedEndTag
+}
+
 pub struct ContentExtractor {
 
 }
@@ -106,7 +111,7 @@ impl ContentExtractor {
         tags
     }
 
-    pub fn extract(&self, content: &str) -> Content {
+    pub fn extract(&self, content: &str) -> Result<Content, ExtractContentError> {
         let tags = self.extract_tags(content);
 
         let mut title: Option<String> = None;
@@ -136,35 +141,38 @@ impl ContentExtractor {
                     }
                 },
                 TagType::End => {
-                    let start_tag = tag_stack.pop().unwrap();
-                    if ignore_tag.is_some() {
-                        if ignore_tag.as_ref().unwrap() == &tag.tag_name {
-                            ignore_tag = None;
-                        }
+                    if let Some(start_tag) = tag_stack.pop() {
+                        if ignore_tag.is_some() {
+                            if ignore_tag.as_ref().unwrap() == &tag.tag_name {
+                                ignore_tag = None;
+                            }
 
-                        continue;
-                    }
-
-                    if index - start_tag.index == 1 && start_tag.tag.tag_name == tag.tag_name {
-                        // Ignore content
-                        if start_tag.tag.tag_name == "script" || start_tag.tag.tag_name == "style" {
                             continue;
                         }
 
-                        let extracted_tag_content = std::str::from_utf8(&content_array[start_tag.tag.end_index..tag.start_index]).unwrap();
+                        if index - start_tag.index == 1 && start_tag.tag.tag_name == tag.tag_name {
+                            // Ignore content
+                            if start_tag.tag.tag_name == "script" || start_tag.tag.tag_name == "style" {
+                                continue;
+                            }
 
-                        if start_tag.tag.tag_name != "title" {
-                            extracted += extracted_tag_content;
-                        } else {
-                            // Set title of the document based on the '<title'> tag
-                            title = Some(extracted_tag_content.to_owned());
+                            let extracted_tag_content = std::str::from_utf8(&content_array[start_tag.tag.end_index..tag.start_index]).unwrap();
+
+                            if start_tag.tag.tag_name != "title" {
+                                extracted += extracted_tag_content;
+                            } else {
+                                // Set title of the document based on the '<title'> tag
+                                title = Some(extracted_tag_content.to_owned());
+                            }
                         }
+                    } else {
+                        return Err(ExtractContentError::ExpectedEndTag);
                     }
                 }
             }
         }
 
-        Content::new(title, extracted)
+        Ok(Content::new(title, extracted))
     }
 }
 
@@ -173,6 +181,9 @@ fn test_extract1() {
     let content = "<div>Testing.</div>";
     let extractor = ContentExtractor::new();
     let extracted = extractor.extract(content);
+
+    assert!(extracted.is_ok());
+    let extracted = extracted.unwrap();
     assert_eq!("Testing.", &extracted.body)
 }
 
@@ -181,6 +192,9 @@ fn test_extract2() {
     let content = "<div><p>Testing.</p></div>";
     let extractor = ContentExtractor::new();
     let extracted = extractor.extract(content);
+
+    assert!(extracted.is_ok());
+    let extracted = extracted.unwrap();
     assert_eq!("Testing.", &extracted.body)
 }
 
@@ -189,6 +203,9 @@ fn test_extract3() {
     let content = "<div>Hello <b>my</b> friend.</div>";
     let extractor = ContentExtractor::new();
     let extracted = extractor.extract(content);
+
+    assert!(extracted.is_ok());
+    let extracted = extracted.unwrap();
     assert_eq!("Hello my friend.", &extracted.body)
 }
 
@@ -197,6 +214,9 @@ fn test_extract4() {
     let content = "<div><span>Hello </span><b>my</b><span> friend.</span></div>";
     let extractor = ContentExtractor::new();
     let extracted = extractor.extract(content);
+
+    assert!(extracted.is_ok());
+    let extracted = extracted.unwrap();
     assert_eq!("Hello my friend.", &extracted.body)
 }
 
@@ -205,6 +225,9 @@ fn test_extract5() {
     let content = "<div><b>Haha</b><i>Wololo</i></div>";
     let extractor = ContentExtractor::new();
     let extracted = extractor.extract(content);
+
+    assert!(extracted.is_ok());
+    let extracted = extracted.unwrap();
     assert_eq!("HahaWololo", &extracted.body)
 }
 
@@ -213,6 +236,9 @@ fn test_extract6() {
     let content = "<div><b>Haha</b> <i>Wololo</i></div>";
     let extractor = ContentExtractor::new();
     let extracted = extractor.extract(content);
+
+    assert!(extracted.is_ok());
+    let extracted = extracted.unwrap();
     assert_eq!("Haha Wololo", &extracted.body)
 }
 
@@ -221,6 +247,9 @@ fn test_extract7() {
     let content = "<div><b>Haha</b> <i>Wololo</k></div>";
     let extractor = ContentExtractor::new();
     let extracted = extractor.extract(content);
+
+    assert!(extracted.is_ok());
+    let extracted = extracted.unwrap();
     assert_eq!("Haha ", &extracted.body)
 }
 
@@ -229,6 +258,9 @@ fn test_extract8() {
     let content = "<div><b>Haha</b> <i>Wololo</k>Again</div>";
     let extractor = ContentExtractor::new();
     let extracted = extractor.extract(content);
+
+    assert!(extracted.is_ok());
+    let extracted = extracted.unwrap();
     assert_eq!("Haha Again", &extracted.body)
 }
 
@@ -237,6 +269,9 @@ fn test_extract9() {
     let content = "<div><b>Haha</b> <a href=\"wololo\">Wololo</a> Again</div>";
     let extractor = ContentExtractor::new();
     let extracted = extractor.extract(content);
+
+    assert!(extracted.is_ok());
+    let extracted = extracted.unwrap();
     assert_eq!("Haha Wololo Again", &extracted.body)
 }
 
@@ -245,6 +280,9 @@ fn test_extract10() {
     let content = "<div><b>Haha</b> <script>Ignore this</script>Again</div>";
     let extractor = ContentExtractor::new();
     let extracted = extractor.extract(content);
+
+    assert!(extracted.is_ok());
+    let extracted = extracted.unwrap();
     assert_eq!("Haha Again", &extracted.body)
 }
 
@@ -253,6 +291,9 @@ fn test_extract11() {
     let content = "<div><b>Haha</b> <sup><b>Ignore this</b></sup>Again</div>";
     let extractor = ContentExtractor::new();
     let extracted = extractor.extract(content);
+
+    assert!(extracted.is_ok());
+    let extracted = extracted.unwrap();
     assert_eq!("Haha Again", &extracted.body)
 }
 
@@ -261,13 +302,36 @@ fn test_extract12() {
     let content = "<html><title>Hello, World!</title><div><b>Haha</b> <sup><b>Ignore this</b></sup>Again</div></html>";
     let extractor = ContentExtractor::new();
     let extracted = extractor.extract(content);
+
+    assert!(extracted.is_ok());
+    let extracted = extracted.unwrap();
     assert_eq!("Hello, World!", &extracted.title.unwrap());
     assert_eq!("Haha Again", &extracted.body)
+}
+
+#[test]
+fn test_extract13() {
+    let content = "Testing.</div>";
+    let extractor = ContentExtractor::new();
+    let extracted = extractor.extract(content);
+
+    assert!(extracted.is_err());
+}
+
+#[test]
+fn test_extract14() {
+    let content = "<div>Testing.";
+    let extractor = ContentExtractor::new();
+    let extracted = extractor.extract(content);
+
+    assert!(extracted.is_ok());
 }
 
 #[test]
 fn test_extract_full_page() {
     let content = std::fs::read_to_string("testdata/test_full_page.txt").unwrap();
     let extractor = ContentExtractor::new();
-    extractor.extract(&content);
+    let extracted = extractor.extract(&content);
+
+    assert!(extracted.is_ok());
 }

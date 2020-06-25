@@ -60,11 +60,17 @@ async fn main_crawl() -> Result<(), Box<dyn std::error::Error>> {
 
         for result in &result_receiver {
             if let Some(result) = result {
-                let parsed_content = parser.parse(&result.content);
-                indexer.add_document(Document::new(
-                    parsed_content.title.unwrap_or(String::new()),
-                    parsed_content.tokens
-                ));
+                match parser.parse(&result.content) {
+                    Ok(parsed_content) => {
+                        indexer.add_document(Document::new(
+                            parsed_content.title.unwrap_or(String::new()),
+                            parsed_content.tokens
+                        ));
+                    }
+                    Err(err) => {
+                        println!("Failed parsing content due to: {:?}", err)
+                    }
+                }
             } else {
                 break;
             }
@@ -88,17 +94,22 @@ fn main_index_from_files() {
     let parser = Parser::new();
 
     let t0 = std::time::Instant::now();
-    let mut document_index = 0;
     visit_dirs(
         "test_data/wiki".as_ref(),
         &mut |entry| {
             let content = std::fs::read_to_string(entry.path()).unwrap();
-            let parsed_content = parser.parse(&content);
-            indexer.add_document(Document::new(
-                parsed_content.title.unwrap_or(String::new()),
-                parsed_content.tokens
-            ));
-            document_index += 1;
+
+            match parser.parse(&content) {
+                Ok(parsed_content) => {
+                    indexer.add_document(Document::new(
+                        parsed_content.title.unwrap_or(String::new()),
+                        parsed_content.tokens
+                    ));
+                },
+                Err(err) => {
+                    println!("Failed parsing content due to: {:?}", err);
+                }
+            }
         }
     ).unwrap();
     println!("Built index in: {} seconds", (std::time::Instant::now() - t0).as_millis() as f64 / 1000.0);
